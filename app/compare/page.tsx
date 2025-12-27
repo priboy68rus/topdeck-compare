@@ -16,6 +16,7 @@ interface CardComparison {
   oracleId?: string;
   imageUrl?: string;
   imageUrls?: string[];
+  eurPrice?: number;
   tags: string[];
   quantity: number;
   listings: (TopdeckListingEntry & { oracleId?: string })[];
