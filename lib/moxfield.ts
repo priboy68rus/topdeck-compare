@@ -92,7 +92,7 @@ export async function fetchMoxfieldWishlist(deckUrl: string): Promise<{
       return;
     }
 
-    Object.values(board.cards ?? {}).forEach((entry) => {
+    Object.values(board.cards ?? {}).forEach((entry: any) => {
       const name = entry.card?.name || entry.name;
       const quantity = entry.quantity ?? 1;
       const tags = name
