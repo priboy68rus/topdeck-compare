@@ -213,6 +213,35 @@ button {
   white-space: pre-wrap;
 }
 
+.cart-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cart-controls .chip-button {
+  padding: 6px 10px;
+  height: 30px;
+  font-size: 0.95rem;
+}
+
+.cart-qty {
+  min-width: 60px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.cart-list {
+  display: grid;
+  gap: 6px;
+}
+
+.cart-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .spinner {
   width: 44px;
   height: 44px;

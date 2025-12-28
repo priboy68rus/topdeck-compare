@@ -106,10 +106,40 @@ function summarizeListings(listings: CardRow["listings"]) {
   });
 }
 
-export default function ResultsTable({ rows, useTags }: { rows: CardRow[]; useTags: boolean }) {
+export default function ResultsTable({
+  rows,
+  useTags,
+  showCart
+}: {
+  rows: CardRow[];
+  useTags: boolean;
+  showCart: boolean;
+}) {
   const [sorting, setSorting] = useState<SortingState>([
     { id: useTags ? "tag" : "name", desc: false }
   ]);
+  const [cart, setCart] = useState<Record<string, number>>({});
+
+  const rowKey = (row: CardRow) =>
+    row.oracleId ? `oracle:${row.oracleId}` : `name:${row.name.toLowerCase()}`;
+  const listingKey = (row: CardRow, idx: number, entry: TopdeckListingEntry) =>
+    `${rowKey(row)}::${idx}::${entry.rawLine}`;
+
+  React.useEffect(() => {
+    setCart((prev) => {
+      const next = { ...prev };
+      rows.forEach((row) => {
+        row.listings.forEach((entry, idx) => {
+          const key = listingKey(row, idx, entry);
+          if (!(key in next)) {
+            next[key] = 0;
+          }
+        });
+      });
+      return next;
+    });
+  }, [rows]);
+
   React.useEffect(() => {
     setSorting([{ id: useTags ? "tag" : "name", desc: false }]);
   }, [useTags]);
@@ -209,9 +239,67 @@ export default function ResultsTable({ rows, useTags }: { rows: CardRow[]; useTa
               </div>
             );
           }
-        }
+        },
+        ...(showCart
+          ? [
+              {
+                id: "cart",
+                header: "Cart",
+                enableSorting: false,
+                size: 180,
+                cell: (ctx: any) => {
+                  const row = ctx.row.original as CardRow;
+                  if (!row.listings.length) {
+                    return <span className="muted">—</span>;
+                  }
+                  return (
+                    <div className="cart-list">
+                      {row.listings.map((entry, idx) => {
+                        const maxQty = entry.quantity ?? 0;
+                        const key = listingKey(row, idx, entry);
+                        const qty = cart[key] ?? 0;
+                        const dec = () =>
+                          setCart((prev) => ({ ...prev, [key]: Math.max(0, qty - 1) }));
+                        const inc = () =>
+                          setCart((prev) => ({ ...prev, [key]: Math.min(maxQty, qty + 1) }));
+
+                        return (
+                          <div className="cart-controls" key={key}>
+                            <span className="muted">
+                              {maxQty > 0 ? `${maxQty}x` : "—"} @{entry.price}₽
+                            </span>
+                            <div className="cart-buttons">
+                              <button
+                                type="button"
+                                className="chip-button"
+                                onClick={dec}
+                                disabled={qty <= 0}
+                              >
+                                −
+                              </button>
+                              <span className="cart-qty">
+                                {qty}/{maxQty || 0}
+                              </span>
+                              <button
+                                type="button"
+                                className="chip-button"
+                                onClick={inc}
+                                disabled={qty >= maxQty}
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                }
+              } as ColumnDef<CardRow>
+            ]
+          : [])
       ],
-    [useTags]
+    [useTags, showCart, cart]
   );
 
   const table = useReactTable({

@@ -12,6 +12,7 @@ export default function ResultsView({ rows }: { rows: CardRow[] }) {
   const [onlyListed, setOnlyListed] = useState(false);
   const [eurToRub, setEurToRub] = useState(90);
   const [useTags, setUseTags] = useState(true);
+  const [showCart, setShowCart] = useState(false);
 
   const filteredRows = useMemo(
     () => (onlyListed ? rows.filter((r) => r.listings.length > 0) : rows),
@@ -97,9 +98,17 @@ export default function ResultsView({ rows }: { rows: CardRow[] }) {
           />
           <span>Use tags</span>
         </label>
+        <label className="rate-input">
+          <input
+            type="checkbox"
+            checked={showCart}
+            onChange={(e) => setShowCart(e.target.checked)}
+          />
+          <span>Show cart</span>
+        </label>
       </div>
       {view === "table" ? (
-        <ResultsTable rows={sortedRows} useTags={useTags} />
+        <ResultsTable rows={sortedRows} useTags={useTags} showCart={showCart} />
       ) : view === "gallery" ? (
         <ResultsGallery rows={sortedRows} useTags={useTags} />
       ) : (
