@@ -1,7 +1,9 @@
 import fs from "fs/promises";
 import { createWriteStream } from "fs";
+import { Readable } from "stream";
 import path from "path";
 import { pipeline } from "stream/promises";
+import { parser as jsonParser } from "stream-json";
 import { streamArray } from "stream-json/streamers/StreamArray";
 import { normalizeCardName, normalizeForMatching } from "./names";
 import { log } from "./logger";
@@ -96,11 +98,11 @@ async function downloadBulkData(downloadUri: string, updatedAt: string) {
 
   await fs.mkdir(DATA_DIR, { recursive: true });
   const out = createWriteStream(DATA_PATH, { encoding: "utf8" });
-  const parser = streamArray();
+  const arrayStreamer = streamArray();
   let first = true;
   let wroteAny = false;
 
-  parser.on("data", ({ value }: { value: any }) => {
+  arrayStreamer.on("data", ({ value }: { value: any }) => {
     const slim = {
       oracle_id: value.oracle_id,
       name: value.name,
@@ -123,7 +125,12 @@ async function downloadBulkData(downloadUri: string, updatedAt: string) {
     wroteAny = true;
   });
 
-  await pipeline(response.body as any, parser);
+  const readable = response.body ? (Readable.fromWeb(response.body as any) as any) : null;
+  if (!readable) {
+    throw new Error("No response body while downloading Scryfall data");
+  }
+
+  await pipeline(readable, jsonParser(), arrayStreamer);
   if (wroteAny) {
     out.write("]");
   } else {

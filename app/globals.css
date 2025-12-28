@@ -115,10 +115,12 @@ button {
   color: #cbd5e1;
   padding: 10px 14px;
   font-weight: 700;
+  border-radius: 0;
 }
 
 .segmented button:last-child {
   border-right: none;
+  border-radius: 0;
 }
 
 .segmented .active {
