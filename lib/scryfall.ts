@@ -1,5 +1,8 @@
 import fs from "fs/promises";
+import { createWriteStream } from "fs";
 import path from "path";
+import { pipeline } from "stream/promises";
+import { StreamArray } from "stream-json/streamers/StreamArray";
 import { normalizeCardName, normalizeForMatching } from "./names";
 import { log } from "./logger";
 
@@ -87,13 +90,46 @@ async function fetchBulkMeta(): Promise<ScryfallBulkMeta> {
 
 async function downloadBulkData(downloadUri: string, updatedAt: string) {
   const response = await fetch(downloadUri, { cache: "no-store" });
-  if (!response.ok) {
+  if (!response.ok || !response.body) {
     throw new Error(`Failed to download Scryfall data (${response.status})`);
   }
 
-  const buffer = Buffer.from(await response.arrayBuffer());
   await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(DATA_PATH, buffer);
+  const out = createWriteStream(DATA_PATH, { encoding: "utf8" });
+  const parser = StreamArray.withParser();
+  let first = true;
+  let wroteAny = false;
+
+  parser.on("data", ({ value }) => {
+    const slim = {
+      oracle_id: value.oracle_id,
+      name: value.name,
+      printed_name: value.printed_name,
+      games: value.games,
+      finishes: value.finishes,
+      frame_effects: value.frame_effects,
+      full_art: value.full_art,
+      promo: value.promo,
+      set_type: value.set_type,
+      set: value.set,
+      border_color: value.border_color,
+      frame: value.frame,
+      prices: { eur: value.prices?.eur ?? null },
+      image_uris: value.image_uris,
+      card_faces: value.card_faces
+    };
+    out.write((first ? "[" : ",") + JSON.stringify(slim));
+    first = false;
+    wroteAny = true;
+  });
+
+  await pipeline(response.body as any, parser);
+  if (wroteAny) {
+    out.write("]");
+  } else {
+    out.write("[]");
+  }
+  out.end();
 
   const meta: StoredMeta = {
     updatedAt,
