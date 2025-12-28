@@ -100,7 +100,7 @@ async function downloadBulkData(downloadUri: string, updatedAt: string) {
   let first = true;
   let wroteAny = false;
 
-  parser.on("data", ({ value }) => {
+  parser.on("data", ({ value }: { value: any }) => {
     const slim = {
       oracle_id: value.oracle_id,
       name: value.name,
