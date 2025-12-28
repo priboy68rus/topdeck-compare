@@ -130,7 +130,7 @@ async function downloadBulkData(downloadUri: string, updatedAt: string) {
     throw new Error("No response body while downloading Scryfall data");
   }
 
-  await pipeline(readable, jsonParser(), arrayStreamer);
+  await pipeline(readable as any, jsonParser() as any, arrayStreamer as any);
   if (wroteAny) {
     out.write("]");
   } else {
