@@ -111,16 +111,18 @@ export async function fetchMoxfieldWishlist(deckUrl: string): Promise<{
   });
 
   log("info", "Parsed Moxfield wishlist", { deckId, cards: cards.length });
+
+  const anyDeck = deck as any;
+  const creator =
+    anyDeck.createdByUser?.displayName ||
+    anyDeck.createdByUser?.userName ||
+    anyDeck.createdBy ||
+    anyDeck.user?.userName ||
+    anyDeck.userName;
+
   return {
     deckName: deck.name || deckId,
-    author:
-      (deck as { createdByUser?: { userName?: string; displayName?: string } }).createdByUser
-        ?.displayName ||
-      (deck as { createdByUser?: { userName?: string; displayName?: string } }).createdByUser
-        ?.userName ||
-      deck.createdBy ||
-      deck.user?.userName ||
-      deck.userName,
+    author: creator,
     cards
   };
 }
