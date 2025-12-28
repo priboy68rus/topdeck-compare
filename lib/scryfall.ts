@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import { createWriteStream } from "fs";
 import path from "path";
 import { pipeline } from "stream/promises";
-import { StreamArray } from "stream-json/streamers/StreamArray";
+import { streamArray } from "stream-json/streamers/StreamArray";
 import { normalizeCardName, normalizeForMatching } from "./names";
 import { log } from "./logger";
 
@@ -96,7 +96,7 @@ async function downloadBulkData(downloadUri: string, updatedAt: string) {
 
   await fs.mkdir(DATA_DIR, { recursive: true });
   const out = createWriteStream(DATA_PATH, { encoding: "utf8" });
-  const parser = StreamArray.withParser();
+  const parser = streamArray();
   let first = true;
   let wroteAny = false;
 
