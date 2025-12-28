@@ -62,6 +62,7 @@ async function fetchDeckJson(deckId: string) {
 
 export async function fetchMoxfieldWishlist(deckUrl: string): Promise<{
   deckName: string;
+  author?: string;
   cards: DeckCard[];
 }> {
   const deckId = parseMoxfieldDeckId(deckUrl);
@@ -112,6 +113,14 @@ export async function fetchMoxfieldWishlist(deckUrl: string): Promise<{
   log("info", "Parsed Moxfield wishlist", { deckId, cards: cards.length });
   return {
     deckName: deck.name || deckId,
+    author:
+      (deck as { createdByUser?: { userName?: string; displayName?: string } }).createdByUser
+        ?.displayName ||
+      (deck as { createdByUser?: { userName?: string; displayName?: string } }).createdByUser
+        ?.userName ||
+      deck.createdBy ||
+      deck.user?.userName ||
+      deck.userName,
     cards
   };
 }

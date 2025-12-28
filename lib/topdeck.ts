@@ -10,6 +10,9 @@ export interface TopdeckListingEntry {
 
 type CacheEntry = {
   data: TopdeckListingEntry[];
+  title: string;
+  author?: string;
+  authorId?: string;
   expiresAt: number;
 };
 
@@ -112,12 +115,22 @@ function parseListingText(text: string): TopdeckListingEntry[] {
 
 export async function fetchTopdeckListing(
   url: string
-): Promise<TopdeckListingEntry[]> {
+): Promise<{
+  entries: TopdeckListingEntry[];
+  title: string;
+  author: string;
+  authorId: string;
+}> {
   const now = Date.now();
   const cached = cache.get(url);
   if (cached && cached.expiresAt > now) {
     log("debug", "Topdeck cache hit", { url });
-    return cached.data;
+    return {
+      entries: cached.data,
+      title: cached.title,
+      author: cached.author || "",
+      authorId: cached.authorId || ""
+    };
   }
 
   log("info", "Fetching Topdeck page", { url });
@@ -133,10 +146,32 @@ export async function fetchTopdeckListing(
 
   const html = await response.text();
   const content = pickContent(html);
+  const $ = load(html);
+  const title =
+    $("title").first().text().trim() ||
+    $("h1").first().text().trim() ||
+    url;
+
+  const author =
+    $(".cAuthorPane_author.ipsType_break").first().text().trim() ||
+    $(".ipsType_blendLinks.ipsType_normal").find("a").first().text().trim() ||
+    "";
+  const profileHref =
+    $(".cAuthorPane_photo a").attr("href") ||
+    $(".ipsType_blendLinks.ipsType_normal").find("a").attr("href") ||
+    "";
+  const authorIdMatch = profileHref.match(/profile\/(\d+)/i);
+  const authorId = authorIdMatch ? authorIdMatch[1] : "";
 
   const parsed = parseListingText(content);
   log("info", "Parsed Topdeck listings", { url, count: parsed.length });
-  cache.set(url, { data: parsed, expiresAt: now + CACHE_TTL_MS });
+  cache.set(url, {
+    data: parsed,
+    title,
+    author,
+    authorId,
+    expiresAt: now + CACHE_TTL_MS
+  });
 
-  return parsed;
+  return { entries: parsed, title, author, authorId };
 }

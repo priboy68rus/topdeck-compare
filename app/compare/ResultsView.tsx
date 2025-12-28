@@ -49,8 +49,8 @@ export default function ResultsView({ rows }: { rows: CardRow[] }) {
 
   return (
     <div>
-      <div className="inline-actions" style={{ marginBottom: 12, gap: 12 }}>
-        <div className="segmented">
+      <div className="inline-actions actions-row" style={{ marginBottom: 12, gap: 12 }}>
+        <div className="segmented" style={{ height: 38 }}>
           <button
             type="button"
             className={`compact ${view === "table" ? "active" : ""}`}
@@ -97,15 +97,6 @@ export default function ResultsView({ rows }: { rows: CardRow[] }) {
           />
           <span>Use tags</span>
         </label>
-        <span className="pill">
-          Total Topdeck ₽:{" "}
-          <strong>
-            {new Intl.NumberFormat("en-US", {
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 0
-            }).format(totalTopdeckRub)}
-          </strong>
-        </span>
       </div>
       {view === "table" ? (
         <ResultsTable rows={sortedRows} useTags={useTags} />

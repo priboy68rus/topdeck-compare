@@ -32,6 +32,14 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
       ? searchParams.topdeckUrl
       : "";
 
+  const decodeSafe = (url: string) => {
+    try {
+      return decodeURI(url);
+    } catch {
+      return url;
+    }
+  };
+
   if (!moxfieldUrl || !topdeckUrl) {
     return (
       <main>
@@ -48,13 +56,21 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
 
   let comparisons: CardComparison[] = [];
   let deckName = "Wishlist";
+  let deckAuthor = "";
   let fetchError: string | null = null;
+  let topdeckTitle = "Topdeck";
+  let topdeckAuthor = "";
+  let topdeckAuthorId = "";
 
   try {
-    const [moxfield, topdeckEntries] = await Promise.all([
+    const [moxfield, topdeckResult] = await Promise.all([
       fetchMoxfieldWishlist(moxfieldUrl),
       fetchTopdeckListing(topdeckUrl)
     ]);
+    const topdeckEntries = topdeckResult.entries;
+    topdeckTitle = topdeckResult.title;
+    topdeckAuthor = topdeckResult.author;
+    topdeckAuthorId = topdeckResult.authorId;
 
     const allNames = [
       ...moxfield.cards.map((c) => c.name),
@@ -63,6 +79,7 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
     await primeOracleData(allNames);
 
     deckName = moxfield.deckName;
+    deckAuthor = moxfield.author || "";
 
     const listingMap = new Map<string, (TopdeckListingEntry & { oracleId?: string })[]>();
     const makeKey = (oracleId: string | undefined, name: string): string | null => {
@@ -142,18 +159,80 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
               Checking cards from <strong>{deckName}</strong> against the Topdeck listing.
             </p>
           </div>
-          <div className="inline-actions">
-            <Link href="/" className="pill">
-              ← New search
-            </Link>
-            <a href={moxfieldUrl} className="pill" target="_blank" rel="noreferrer">
-              Moxfield
-            </a>
-            <a href={topdeckUrl} className="pill" target="_blank" rel="noreferrer">
-              Topdeck
-            </a>
-          </div>
         </div>
+
+        <div className="inline-actions actions-row">
+          <Link href="/" className="pill" style={{ textDecoration: "none" }}>
+            ← New search
+          </Link>
+        </div>
+        <div className="inline-actions actions-row">
+          <a href={moxfieldUrl} className="pill" target="_blank" rel="noreferrer">
+            <img
+              src="https://www.google.com/s2/favicons?domain=moxfield.com&sz=64"
+              alt="Moxfield"
+              style={{ width: 16, height: 16 }}
+            />{" "}
+            {deckAuthor ? `${deckAuthor}'s Wish List` : deckName}
+          </a>
+          <a href={topdeckUrl} className="pill" target="_blank" rel="noreferrer">
+            <img
+              src="https://www.google.com/s2/favicons?domain=topdeck.ru&sz=64"
+              alt="Topdeck"
+              style={{ width: 16, height: 16 }}
+            />{" "}
+            {topdeckTitle || decodeSafe(topdeckUrl)}
+          </a>
+        </div>
+        {!fetchError && (
+          <div className="inline-actions actions-row">
+            <CopyListingsButton rows={rows} />
+            {topdeckAuthorId && (
+              <a
+                href={`https://topdeck.ru/messenger/compose/?to=${topdeckAuthorId}`}
+                className="pill"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <img
+                  src="https://www.google.com/s2/favicons?domain=topdeck.ru&sz=64"
+                  alt="Message"
+                  style={{ width: 16, height: 16 }}
+                />
+                Send message to {topdeckAuthor || "author"}
+              </a>
+            )}
+            <span className="pill">
+              Total Topdeck ₽:{" "}
+              <strong>
+                {new Intl.NumberFormat("en-US", {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0
+                }).format(
+                  rows.reduce((sum, row) => {
+                    if (!row.listings.length) return sum;
+                    const cheapest = Math.min(...row.listings.map((l) => l.price));
+                    return sum + cheapest * row.wishlistQty;
+                  }, 0)
+                )}
+              </strong>
+            </span>
+          </div>
+        )}
+
+        {!fetchError && (
+          <div className="inline-actions actions-row" style={{ marginBottom: 8 }}>
+            <span className="pill">
+              Total cards: <strong>{comparisons.length}</strong>
+            </span>
+            <span className="pill">
+              Listed on Topdeck: <strong>{listedCount}</strong>
+            </span>
+            <span className="pill">
+              Unresolved names: <strong>{unresolvedCount}</strong>
+            </span>
+          </div>
+        )}
 
         {fetchError ? (
           <div className="card" style={{ marginTop: 12, background: "#1e293b" }}>
@@ -163,19 +242,6 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
           </div>
         ) : (
           <>
-            <div className="inline-actions" style={{ marginTop: 12, marginBottom: 6 }}>
-              <span className="pill">
-                Total cards: <strong>{comparisons.length}</strong>
-              </span>
-              <span className="pill">
-                Listed on Topdeck: <strong>{listedCount}</strong>
-              </span>
-              <span className="pill">
-                Unresolved names: <strong>{unresolvedCount}</strong>
-              </span>
-              <CopyListingsButton rows={rows} />
-            </div>
-
             <ResultsView rows={rows} />
           </>
         )}

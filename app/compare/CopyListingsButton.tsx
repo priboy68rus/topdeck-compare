@@ -45,8 +45,16 @@ export default function CopyListingsButton({ rows }: { rows: CardRow[] }) {
   };
 
   return (
-    <button type="button" className="compact" onClick={handleCopy}>
-      {status === "copied" ? "Copied!" : "Copy Topdeck listings"}
-    </button>
+    <>
+      <button type="button" className="compact" onClick={handleCopy}>
+        Copy Topdeck listings
+      </button>
+      {status === "copied" && (
+        <div className="toast toast-floating">Copied to clipboard!</div>
+      )}
+      {status === "error" && (
+        <div className="toast toast-floating error">Nothing to copy</div>
+      )}
+    </>
   );
 }
