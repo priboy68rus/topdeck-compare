@@ -10,5 +10,6 @@ declare module "stream-json/streamers/StreamArray" {
   export interface StreamArrayEmitter<T = any> extends Readable {
     on(event: "data", listener: (item: StreamArrayItem<T>) => void): this;
   }
+  export function streamArray<T = any>(options?: StreamArrayOptions): StreamArrayEmitter<T>;
   export function withParser<T = any>(options?: StreamArrayOptions): StreamArrayEmitter<T>;
 }
