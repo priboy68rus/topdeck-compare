@@ -4,6 +4,17 @@ import { getOracleData } from "../lib/scryfall";
 const PORT = Number(process.env.RESOLVER_PORT || 4000);
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
 
+function sanitizeName(raw: string): string {
+  return raw
+    .replace(/^[\s\d+xX-]+/, "")
+    .replace(/\s+-\s*[\d\s.,]+$/, "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/\bpromo\b/gi, "")
+    .replace(/\bfoil\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 function sendJson(res: http.ServerResponse, status: number, data: unknown) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -32,9 +43,14 @@ const server = http.createServer(async (req, res) => {
 
   const url = new URL(req.url, `http://localhost:${PORT}`);
   if (url.pathname === "/resolve") {
-    const name = url.searchParams.get("name");
-    if (!name) {
+    const rawName = url.searchParams.get("name");
+    if (!rawName) {
       sendJson(res, 400, { error: "Missing name query param" });
+      return;
+    }
+    const name = sanitizeName(rawName);
+    if (!name) {
+      sendJson(res, 400, { error: "Empty name after sanitization" });
       return;
     }
 
@@ -56,14 +72,21 @@ const server = http.createServer(async (req, res) => {
     req.on("end", async () => {
       try {
         const parsed = JSON.parse(body || "{}") as { names?: string[] };
-        const names = Array.from(new Set(parsed.names ?? [])).filter(Boolean);
+        const names = Array.from(
+          new Set(
+            (parsed.names ?? [])
+              .map((n) => sanitizeName(n || ""))
+              .filter(Boolean)
+          )
+        );
         const results = await Promise.all(
           names.map(async (name) => {
             const data = await getOracleData(name);
             return { name, ...data };
           })
         );
-        sendJson(res, 200, { results });
+        const filtered = results.filter((r) => r.oracleId);
+        sendJson(res, 200, { results: filtered });
       } catch (error) {
         console.error("Resolver batch error", error);
         sendJson(res, 400, { error: "Invalid batch request" });
