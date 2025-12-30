@@ -1,0 +1,20 @@
+[
+  {
+    "id": "topdeck-update",
+    "execute-command": "/srv/topdeck-compare/scripts/update-and-restart.sh",
+    "command-working-directory": "/srv/topdeck-compare",
+    "pass-arguments-to-command": [
+      { "source": "payload", "name": "head_commit.id" }
+    ],
+    "trigger-rule": {
+      "match": {
+        "type": "value",
+        "value": "push",
+        "parameter": {
+          "source": "header",
+          "name": "X-GitHub-Event"
+        }
+      }
+    }
+  }
+]
