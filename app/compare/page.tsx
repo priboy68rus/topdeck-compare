@@ -2,7 +2,7 @@ import Link from "next/link";
 import { fetchMoxfieldWishlist } from "../../lib/moxfield";
 import { fetchTopdeckListing, TopdeckListingEntry } from "../../lib/topdeck";
 import { normalizeForMatching } from "../../lib/names";
-import { getOracleData, primeOracleData } from "../../lib/scryfall";
+import { getOracleData, getResolverMissCount, primeOracleData } from "../../lib/scryfall";
 import { CardRow } from "./ResultsTable";
 import CopyListingsButton from "./CopyListingsButton";
 import ResultsView from "./ResultsView";
@@ -61,6 +61,7 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
   let topdeckTitle = "Topdeck";
   let topdeckAuthor = "";
   let topdeckAuthorId = "";
+  let resolverMissCount = 0;
 
   try {
     const [moxfield, topdeckResult] = await Promise.all([
@@ -131,6 +132,7 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
     );
 
     comparisons = mapped.sort((a, b) => a.name.localeCompare(b.name));
+    resolverMissCount = getResolverMissCount();
   } catch (error) {
     fetchError =
       error instanceof Error ? error.message : "Failed to fetch the provided URLs.";
@@ -231,6 +233,11 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
             <span className="pill">
               Unresolved names: <strong>{unresolvedCount}</strong>
             </span>
+            {resolverMissCount > 0 && (
+              <span className="pill">
+                Resolver misses: <strong>{resolverMissCount}</strong>
+              </span>
+            )}
           </div>
         )}
 

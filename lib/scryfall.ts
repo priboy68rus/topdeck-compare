@@ -60,6 +60,7 @@ let resolverPromise: Promise<OracleResolver> | null = null;
 const oracleImages = new Map<string, string[]>();
 const oraclePrices = new Map<string, number>();
 const apiNameCache = new Map<string, OracleData>();
+const resolverMisses = new Set<string>();
 
 async function fileExists(filePath: string): Promise<boolean> {
   try {
@@ -506,6 +507,7 @@ export async function getOracleData(name: string): Promise<OracleData> {
 
 export async function primeOracleData(names: string[]): Promise<void> {
   if (!RESOLVER_URL) return;
+  resolverMisses.clear();
   const unique = Array.from(
     new Set(
       names
@@ -526,16 +528,31 @@ export async function primeOracleData(names: string[]): Promise<void> {
     });
     if (!res.ok) throw new Error(`Batch resolver responded ${res.status}`);
     const payload = (await res.json()) as { results?: Array<OracleData & { name?: string }> };
+    const resultMap = new Map<string, OracleData>();
     payload.results?.forEach((item) => {
       const key = item.name ? normalizeForMatching(item.name) || item.name : undefined;
       if (!key) return;
-      apiNameCache.set(key, {
+      resultMap.set(key, {
         oracleId: item.oracleId,
         imageUrls: item.imageUrls ?? [],
         eurPrice: item.eurPrice
       });
     });
+
+    missing.forEach((name) => {
+      const entry = resultMap.get(name);
+      if (entry) {
+        apiNameCache.set(name, entry);
+      } else {
+        resolverMisses.add(name);
+        apiNameCache.set(name, { oracleId: undefined, imageUrls: [], eurPrice: undefined });
+      }
+    });
   } catch (error) {
     log("warn", "Batch resolver failed", { error: String(error) });
   }
+}
+
+export function getResolverMissCount(): number {
+  return resolverMisses.size;
 }
