@@ -6,11 +6,16 @@ const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
 
 function sanitizeName(raw: string): string {
   return raw
-    .replace(/^[\s\d+xX-]+/, "")
-    .replace(/\s+-\s*[\d\s.,]+$/, "")
+    // drop bullets/qty at start
+    .replace(/^[\s•\-\u2013\u2014\d+xX]+/, "")
+    // drop trailing price segments
+    .replace(/\s*[-\u2013\u2014]\s*\d[\d\s.,]*(?:\s*руб)?\s*$/i, "")
+    // remove set/condition parentheses
     .replace(/\([^)]*\)/g, "")
-    .replace(/\bpromo\b/gi, "")
-    .replace(/\bfoil\b/gi, "")
+    // remove condition/foil keywords
+    .replace(/\b(NM|SP|MP|HP|LP|EX|promo|foil)\b/gi, "")
+    // collapse commas/spaces
+    .replace(/,+/g, " ")
     .replace(/\s{2,}/g, " ")
     .trim();
 }
