@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
+
 cd /srv/topdeck-compare
+
+echo "[update] pulling latest changes..."
 git pull --rebase
+
+echo "[update] installing dependencies..."
 npm ci
-systemctl restart topdeck-resolver
+
+echo "[update] restarting resolver..."
+sudo systemctl restart topdeck-resolver
+echo "[update] done."
