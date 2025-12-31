@@ -1,24 +1,9 @@
 import http from "http";
 import { getOracleData } from "../lib/scryfall";
+import { sanitizeListingName } from "../lib/sanitize";
 
 const PORT = Number(process.env.RESOLVER_PORT || 4000);
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
-
-function sanitizeName(raw: string): string {
-  return raw
-    // drop bullets/qty at start
-    .replace(/^[\s•\-\u2013\u2014\d+xX]+/, "")
-    // drop trailing price segments
-    .replace(/\s*[-\u2013\u2014]\s*\d[\d\s.,]*(?:\s*руб)?\s*$/i, "")
-    // remove set/condition parentheses
-    .replace(/\([^)]*\)/g, "")
-    // remove condition/foil keywords
-    .replace(/\b(NM|SP|MP|HP|LP|EX|promo|foil)\b/gi, "")
-    // collapse commas/spaces
-    .replace(/,+/g, " ")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-}
 
 function sendJson(res: http.ServerResponse, status: number, data: unknown) {
   res.statusCode = status;
@@ -53,7 +38,7 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 400, { error: "Missing name query param" });
       return;
     }
-    const name = sanitizeName(rawName);
+    const name = sanitizeListingName(rawName);
     if (!name) {
       sendJson(res, 400, { error: "Empty name after sanitization" });
       return;
@@ -79,9 +64,7 @@ const server = http.createServer(async (req, res) => {
         const parsed = JSON.parse(body || "{}") as { names?: string[] };
         const names = Array.from(
           new Set(
-            (parsed.names ?? [])
-              .map((n) => sanitizeName(n || ""))
-              .filter(Boolean)
+            (parsed.names ?? []).map((n) => sanitizeListingName(n || "")).filter(Boolean)
           )
         );
         const results = await Promise.all(
