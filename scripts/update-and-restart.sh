@@ -2,5 +2,5 @@
 set -e
 cd /srv/topdeck-compare
 git pull --rebase
-npm ci --only=production
+npm ci
 sudo systemctl restart topdeck-resolver
