@@ -11,4 +11,4 @@ i can click compare button and it goes to compare page
 
 for each card it should say whether or not it is listed on topdeck page and if so, what are the prices
 
-topdeck forum page has a post with a list of cards and prices 
+topdeck forum page has a post with a list of cards and prices
