@@ -1,6 +1,5 @@
 import http from "http";
 import { getOracleData } from "../lib/scryfall";
-import { sanitizeListingName } from "../lib/sanitize";
 
 const PORT = Number(process.env.RESOLVER_PORT || 4000);
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
@@ -33,14 +32,9 @@ const server = http.createServer(async (req, res) => {
 
   const url = new URL(req.url, `http://localhost:${PORT}`);
   if (url.pathname === "/resolve") {
-    const rawName = url.searchParams.get("name");
-    if (!rawName) {
-      sendJson(res, 400, { error: "Missing name query param" });
-      return;
-    }
-    const name = sanitizeListingName(rawName);
+    const name = url.searchParams.get("name");
     if (!name) {
-      sendJson(res, 400, { error: "Empty name after sanitization" });
+      sendJson(res, 400, { error: "Missing name query param" });
       return;
     }
 
@@ -62,11 +56,7 @@ const server = http.createServer(async (req, res) => {
     req.on("end", async () => {
       try {
         const parsed = JSON.parse(body || "{}") as { names?: string[] };
-        const names = Array.from(
-          new Set(
-            (parsed.names ?? []).map((n) => sanitizeListingName(n || "")).filter(Boolean)
-          )
-        );
+        const names = Array.from(new Set((parsed.names ?? []).filter(Boolean)));
         const results = await Promise.all(
           names.map(async (name) => {
             const data = await getOracleData(name);

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { fetchTopdeckListing } from "../../../lib/topdeck";
-import { sanitizeListingName } from "../../../lib/sanitize";
+import { getOracleData, primeOracleData } from "../../../lib/scryfall";
+import { normalizeForMatching } from "../../../lib/names";
 
 interface DebugPageProps {
   searchParams?: Record<string, string | string[] | undefined>;
@@ -28,6 +29,19 @@ export default async function DebugPage({ searchParams }: DebugPageProps) {
 
   try {
     const { entries, title } = await fetchTopdeckListing(topdeckUrl);
+    const names = entries
+      .map((entry) => normalizeForMatching(entry.name) || entry.name)
+      .filter(Boolean);
+    if (names.length) {
+      await primeOracleData(names);
+    }
+    const resolved = await Promise.all(
+      entries.map(async (entry) => {
+        const normalizedName = normalizeForMatching(entry.name) || entry.name;
+        const oracle = normalizedName ? await getOracleData(normalizedName) : { oracleId: undefined };
+        return { ...entry, oracleId: oracle.oracleId };
+      })
+    );
 
     return (
       <main>
@@ -54,17 +68,21 @@ export default async function DebugPage({ searchParams }: DebugPageProps) {
             <table>
               <thead>
                 <tr>
-                  <th style={{ width: "40%" }}>Raw line</th>
+                  <th style={{ width: "35%" }}>Raw line</th>
                   <th style={{ width: "30%" }}>Parsed name</th>
-                  <th style={{ width: "30%" }}>Sanitized for resolver</th>
+                  <th style={{ width: "10%" }}>Price</th>
+                  <th style={{ width: "10%" }}>Quantity</th>
+                  <th style={{ width: "15%" }}>Oracle ID</th>
                 </tr>
               </thead>
               <tbody>
-                {entries.map((entry, idx) => (
+                {resolved.map((entry, idx) => (
                   <tr key={idx}>
                     <td style={{ whiteSpace: "pre-wrap" }}>{entry.rawLine}</td>
                     <td>{entry.name}</td>
-                    <td>{sanitizeListingName(entry.rawLine)}</td>
+                    <td>{entry.price ?? "—"}</td>
+                    <td>{entry.quantity ?? "—"}</td>
+                    <td>{entry.oracleId || "—"}</td>
                   </tr>
                 ))}
               </tbody>

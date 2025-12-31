@@ -62,6 +62,8 @@ const oraclePrices = new Map<string, number>();
 const apiNameCache = new Map<string, OracleData>();
 const resolverMisses = new Set<string>();
 
+const resolverKey = (name: string) => normalizeCardName(name);
+
 async function fileExists(filePath: string): Promise<boolean> {
   try {
     await fs.access(filePath);
@@ -262,11 +264,15 @@ function buildResolver(cards: ScryfallCard[]): OracleResolver {
     const names = new Set<string>();
     if (card.name) names.add(card.name);
     if (card.printed_name) names.add(card.printed_name);
+    card.card_faces?.forEach((face) => {
+      if (face?.name) names.add(face.name);
+      if ((face as any)?.printed_name) names.add((face as any).printed_name);
+    });
 
     names.forEach((name) => {
-      const normalized = normalizeForMatching(name);
-      if (normalized) {
-        map.set(normalized, card.oracle_id!);
+      const key = resolverKey(name);
+      if (key) {
+        map.set(key, card.oracle_id!);
       }
     });
   }
@@ -300,11 +306,7 @@ function buildResolver(cards: ScryfallCard[]): OracleResolver {
     }
   });
 
-  return (name: string) => {
-    const key = normalizeForMatching(name);
-    if (!key) return undefined;
-    return map.get(key);
-  };
+  return (name: string) => map.get(resolverKey(name));
 }
 
 export async function getOracleResolver(): Promise<OracleResolver> {
@@ -447,11 +449,12 @@ async function fetchCardFromApi(searchName: string): Promise<ScryfallCard | null
 export async function getOracleData(name: string): Promise<OracleData> {
   // If external resolver is configured, prefer it.
   if (RESOLVER_URL) {
-    const key = normalizeForMatching(name) || name;
+    const queryName = normalizeForMatching(name) || name;
+    const key = queryName?.trim();
     if (key && apiNameCache.has(key)) {
       return apiNameCache.get(key)!;
     }
-    const url = `${RESOLVER_URL.replace(/\/$/, "")}/resolve?name=${encodeURIComponent(name)}`;
+    const url = `${RESOLVER_URL.replace(/\/$/, "")}/resolve?name=${encodeURIComponent(queryName)}`;
     try {
       const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) {
@@ -508,14 +511,16 @@ export async function getOracleData(name: string): Promise<OracleData> {
 export async function primeOracleData(names: string[]): Promise<void> {
   if (!RESOLVER_URL) return;
   resolverMisses.clear();
-  const unique = Array.from(
-    new Set(
-      names
-        .map((n) => normalizeForMatching(n) || n)
-        .filter(Boolean)
-    )
-  );
-  const missing = unique.filter((n) => !apiNameCache.has(n));
+  const unique = Array.from(new Set(names.filter(Boolean)));
+  const missing = unique.filter((n) => {
+    const cached = apiNameCache.get(n);
+    if (!cached) return true;
+    if (cached.oracleId === undefined) {
+      apiNameCache.delete(n);
+      return true;
+    }
+    return false;
+  });
   if (missing.length === 0) return;
 
   try {
@@ -523,14 +528,16 @@ export async function primeOracleData(names: string[]): Promise<void> {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ names: missing }),
+      body: JSON.stringify({
+        names: missing.map((n) => normalizeForMatching(n) || n)
+      }),
       cache: "no-store"
     });
     if (!res.ok) throw new Error(`Batch resolver responded ${res.status}`);
     const payload = (await res.json()) as { results?: Array<OracleData & { name?: string }> };
     const resultMap = new Map<string, OracleData>();
     payload.results?.forEach((item) => {
-      const key = item.name ? normalizeForMatching(item.name) || item.name : undefined;
+      const key = item.name ? item.name.trim() : undefined;
       if (!key) return;
       resultMap.set(key, {
         oracleId: item.oracleId,

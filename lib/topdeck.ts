@@ -19,6 +19,30 @@ type CacheEntry = {
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const cache = new Map<string, CacheEntry>();
 
+const setCodes = new Set<string>();
+let setCodesLoaded = false;
+
+async function ensureSetCodes() {
+  if (setCodesLoaded) return;
+  try {
+    const res = await fetch("https://api.scryfall.com/sets", { cache: "no-store" });
+    if (!res.ok) throw new Error(`Failed to fetch sets: ${res.status}`);
+    const payload = (await res.json()) as { data?: Array<{ code?: string }> };
+    payload.data?.forEach((set) => {
+      if (set.code) setCodes.add(set.code.toUpperCase());
+    });
+    setCodesLoaded = true;
+  } catch (error) {
+    log("warn", "Failed to load set codes, falling back to built-in list", {
+      error: String(error)
+    });
+    ["MH2", "ICE", "DOM", "RVR", "LTR", "MH3", "SNC", "MOM", "2X2"].forEach((c) =>
+      setCodes.add(c)
+    );
+    setCodesLoaded = true;
+  }
+}
+
 function parsePriceString(value: string): number | null {
   const normalized = value.replace(/[^\d.,]/g, "").replace(/\s/g, "");
   const withDot = normalized.replace(",", ".");
@@ -27,12 +51,71 @@ function parsePriceString(value: string): number | null {
 }
 
 function cleanName(raw: string): string {
-  return raw
+  const modifierTokens = new Set(
+    [
+      "NM",
+      "SP",
+      "MP",
+      "HP",
+      "LP",
+      "EX",
+      "PLD",
+      "PO",
+      "PR",
+      "PRO",
+      "PRM",
+      "MPS",
+      "MSC",
+      "MS2",
+      "DE",
+      "EN",
+      "RU",
+      "FR",
+      "GE",
+      "IT",
+      "JP",
+      "KR",
+      "CN",
+      "PT",
+      "ES",
+      "FOIL",
+      "FNM",
+      "ICE",
+      "MIR",
+      "LEG",
+      "BORDERLESS",
+      "EXTENDED",
+      "ETCHED",
+      "GOLDBORDER",
+      "SHOWCASE",
+      "RETRO",
+      "ALT",
+      "SIGNED",
+      "STAMPED",
+      "ARENA",
+      "MTGO"
+    ].map((t) => t.toUpperCase())
+  );
+
+  const pre = raw
     .replace(/^[•\-\u2013\u2014\s]+/, "")
     .replace(/^\d+\s*[xX]?\s+/, "")
     .replace(/\s+[xX]?\d+\s*$/, "")
-    .replace(/\s*\([^)]+\)\s*$/,"")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/[-–—:]+$/, "")
     .trim();
+
+  const tokens = pre.split(/\s+/).filter(Boolean);
+  const filtered = tokens.filter((token) => {
+    let upper = token.toUpperCase();
+    // Normalize Cyrillic lookalikes (e.g., 2Х2 -> 2X2)
+    upper = upper.replace(/\u0425|\u0445/g, "X");
+    if (modifierTokens.has(upper)) return false;
+    if (setCodes.has(upper)) return false;
+    return true;
+  });
+
+  return filtered.join(" ");
 }
 
 function pickContent(html: string): string {
@@ -145,6 +228,7 @@ export async function fetchTopdeckListing(
   }
 
   const html = await response.text();
+  await ensureSetCodes();
   const content = pickContent(html);
   const $ = load(html);
   const title =

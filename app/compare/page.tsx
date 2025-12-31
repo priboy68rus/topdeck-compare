@@ -73,9 +73,10 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
     topdeckAuthor = topdeckResult.author;
     topdeckAuthorId = topdeckResult.authorId;
 
+    const normalizeName = (n: string) => normalizeForMatching(n) || n;
     const allNames = [
-      ...moxfield.cards.map((c) => c.name),
-      ...topdeckEntries.map((t) => t.name)
+      ...moxfield.cards.map((c) => normalizeName(c.name)),
+      ...topdeckEntries.map((t) => normalizeName(t.name))
     ];
     await primeOracleData(allNames);
 
@@ -91,15 +92,19 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
 
     const topdeckWithOracle = await Promise.all(
       topdeckEntries.map(async (entry) => {
-        const data = await getOracleData(entry.name);
-        const normalized = normalizeForMatching(entry.name);
-        return { ...entry, oracleId: data.oracleId, normalizedName: normalized };
+        const normalizedName = normalizeForMatching(entry.name) || entry.name;
+        const data = await getOracleData(normalizedName);
+        return {
+          ...entry,
+          normalizedName,
+          oracleId: data.oracleId
+        };
       })
     );
 
     topdeckWithOracle.forEach((entry) => {
       const keys = [
-        makeKey(entry.oracleId, entry.name),
+        makeKey(entry.oracleId, entry.normalizedName ?? entry.name),
         entry.normalizedName ? `name:${entry.normalizedName}` : null
       ].filter(Boolean) as string[];
       keys.forEach((key) => {
@@ -111,12 +116,13 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
 
     const mapped = await Promise.all(
       moxfield.cards.map(async (card) => {
-        const data = await getOracleData(card.name);
-        const oracleKey = makeKey(data.oracleId, card.name);
-        const nameKey = `name:${normalizeForMatching(card.name)}`;
+        const normalizedName = normalizeForMatching(card.name) || card.name;
+        const data = await getOracleData(normalizedName);
+        const oracleKey = makeKey(data.oracleId, normalizedName);
+        const nameKey = makeKey(undefined, normalizedName);
         const listings =
           (oracleKey && listingMap.get(oracleKey)) ||
-          listingMap.get(nameKey) ||
+          (nameKey ? listingMap.get(nameKey) : undefined) ||
           [];
         return {
           name: card.name,
@@ -185,6 +191,12 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
             />{" "}
             {topdeckTitle || decodeSafe(topdeckUrl)}
           </a>
+          <Link
+            href={`/compare/debug?topdeckUrl=${encodeURIComponent(topdeckUrl)}`}
+            className="pill"
+          >
+            Debug listing
+          </Link>
         </div>
         {!fetchError && (
           <div className="inline-actions actions-row">
