@@ -264,9 +264,9 @@ function buildResolver(cards: ScryfallCard[]): OracleResolver {
     const names = new Set<string>();
     if (card.name) names.add(card.name);
     if (card.printed_name) names.add(card.printed_name);
-    card.card_faces?.forEach((face) => {
+    card.card_faces?.forEach((face: any) => {
       if (face?.name) names.add(face.name);
-      if ((face as any)?.printed_name) names.add((face as any).printed_name);
+      if (face?.printed_name) names.add(face.printed_name);
     });
 
     names.forEach((name) => {
