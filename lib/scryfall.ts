@@ -5,7 +5,7 @@ import path from "path";
 import { pipeline } from "stream/promises";
 import { parser as jsonParser } from "stream-json";
 import { streamArray } from "stream-json/streamers/StreamArray";
-import { normalizeCardName, normalizeForMatching } from "./names";
+import { cleanCardName } from "./names";
 import { log } from "./logger";
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -62,7 +62,7 @@ const oraclePrices = new Map<string, number>();
 const apiNameCache = new Map<string, OracleData>();
 const resolverMisses = new Set<string>();
 
-const resolverKey = (name: string) => normalizeCardName(name);
+const resolverKey = (name: string) => cleanCardName(name);
 
 async function fileExists(filePath: string): Promise<boolean> {
   try {
@@ -447,14 +447,14 @@ async function fetchCardFromApi(searchName: string): Promise<ScryfallCard | null
 }
 
 export async function getOracleData(name: string): Promise<OracleData> {
+  const key = name.trim();
+
   // If external resolver is configured, prefer it.
   if (RESOLVER_URL) {
-    const queryName = normalizeForMatching(name) || name;
-    const key = queryName?.trim();
     if (key && apiNameCache.has(key)) {
       return apiNameCache.get(key)!;
     }
-    const url = `${RESOLVER_URL.replace(/\/$/, "")}/resolve?name=${encodeURIComponent(queryName)}`;
+    const url = `${RESOLVER_URL.replace(/\/$/, "")}/resolve?name=${encodeURIComponent(name)}`;
     try {
       const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) {
@@ -484,13 +484,11 @@ export async function getOracleData(name: string): Promise<OracleData> {
     return { oracleId: oracleId || undefined, imageUrls, eurPrice };
   }
 
-  const key = normalizeForMatching(name);
-  const searchName = key || name;
   if (key && apiNameCache.has(key)) {
     return apiNameCache.get(key)!;
   }
 
-  const card = await fetchCardFromApi(searchName);
+  const card = await fetchCardFromApi(name);
   if (!card) {
     const fallback: OracleData = { oracleId: undefined, imageUrls: [], eurPrice: undefined };
     if (key) apiNameCache.set(key, fallback);
@@ -529,7 +527,7 @@ export async function primeOracleData(names: string[]): Promise<void> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        names: missing.map((n) => normalizeForMatching(n) || n)
+        names: missing
       }),
       cache: "no-store"
     });

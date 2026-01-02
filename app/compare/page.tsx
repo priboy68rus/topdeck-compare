@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { fetchMoxfieldWishlist } from "../../lib/moxfield";
 import { fetchTopdeckListing, TopdeckListingEntry } from "../../lib/topdeck";
-import { normalizeForMatching } from "../../lib/names";
+import { cleanCardName } from "../../lib/names";
 import { getOracleData, getResolverMissCount, primeOracleData } from "../../lib/scryfall";
 import { CardRow } from "./ResultsTable";
 import CopyListingsButton from "./CopyListingsButton";
@@ -73,7 +73,7 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
     topdeckAuthor = topdeckResult.author;
     topdeckAuthorId = topdeckResult.authorId;
 
-    const normalizeName = (n: string) => normalizeForMatching(n) || n;
+    const normalizeName = (n: string) => cleanCardName(n) || n;
     const allNames = [
       ...moxfield.cards.map((c) => normalizeName(c.name)),
       ...topdeckEntries.map((t) => normalizeName(t.name))
@@ -86,13 +86,13 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
     const listingMap = new Map<string, (TopdeckListingEntry & { oracleId?: string })[]>();
     const makeKey = (oracleId: string | undefined, name: string): string | null => {
       if (oracleId) return `oracle:${oracleId}`;
-      const normalized = normalizeForMatching(name);
+      const normalized = cleanCardName(name);
       return normalized ? `name:${normalized}` : null;
     };
 
     const topdeckWithOracle = await Promise.all(
       topdeckEntries.map(async (entry) => {
-        const normalizedName = normalizeForMatching(entry.name) || entry.name;
+        const normalizedName = cleanCardName(entry.name) || entry.name;
         const data = await getOracleData(normalizedName);
         return {
           ...entry,
@@ -116,7 +116,7 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
 
     const mapped = await Promise.all(
       moxfield.cards.map(async (card) => {
-        const normalizedName = normalizeForMatching(card.name) || card.name;
+        const normalizedName = cleanCardName(card.name) || card.name;
         const data = await getOracleData(normalizedName);
         const oracleKey = makeKey(data.oracleId, normalizedName);
         const nameKey = makeKey(undefined, normalizedName);

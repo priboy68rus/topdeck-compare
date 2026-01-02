@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { fetchTopdeckListing } from "../../../lib/topdeck";
 import { getOracleData, primeOracleData } from "../../../lib/scryfall";
-import { normalizeForMatching } from "../../../lib/names";
+import { cleanCardName } from "../../../lib/names";
 
 interface DebugPageProps {
   searchParams?: Record<string, string | string[] | undefined>;
@@ -29,15 +29,13 @@ export default async function DebugPage({ searchParams }: DebugPageProps) {
 
   try {
     const { entries, title } = await fetchTopdeckListing(topdeckUrl);
-    const names = entries
-      .map((entry) => normalizeForMatching(entry.name) || entry.name)
-      .filter(Boolean);
+    const names = entries.map((entry) => cleanCardName(entry.name) || entry.name).filter(Boolean);
     if (names.length) {
       await primeOracleData(names);
     }
     const resolved = await Promise.all(
       entries.map(async (entry) => {
-        const normalizedName = normalizeForMatching(entry.name) || entry.name;
+        const normalizedName = cleanCardName(entry.name) || entry.name;
         const oracle = normalizedName ? await getOracleData(normalizedName) : { oracleId: undefined };
         return { ...entry, oracleId: oracle.oracleId };
       })
