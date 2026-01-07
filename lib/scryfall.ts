@@ -11,7 +11,10 @@ import { log } from "./logger";
 const DATA_DIR = path.join(process.cwd(), "data");
 const DATA_PATH = path.join(DATA_DIR, "scryfall-default-cards.json");
 const META_PATH = path.join(DATA_DIR, "scryfall-default-cards.meta.json");
+const RU_NAMES_PATH = path.join(DATA_DIR, "scryfall-ru-names.json");
+const RU_META_PATH = path.join(DATA_DIR, "scryfall-ru-names.meta.json");
 const BULK_META_URL = "https://api.scryfall.com/bulk-data/default_cards";
+const BULK_ALL_META_URL = "https://api.scryfall.com/bulk-data/all_cards";
 const USE_API_MODE = process.env.SCRYFALL_MODE === "api";
 const RESOLVER_URL = process.env.ORACLE_RESOLVER_URL;
 
@@ -73,20 +76,20 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-async function readStoredMeta(): Promise<StoredMeta | null> {
-  if (!(await fileExists(META_PATH))) {
+async function readStoredMeta(metaPath: string): Promise<StoredMeta | null> {
+  if (!(await fileExists(metaPath))) {
     return null;
   }
   try {
-    const raw = await fs.readFile(META_PATH, "utf8");
+    const raw = await fs.readFile(metaPath, "utf8");
     return JSON.parse(raw) as StoredMeta;
   } catch {
     return null;
   }
 }
 
-async function fetchBulkMeta(): Promise<ScryfallBulkMeta> {
-  const response = await fetch(BULK_META_URL, { cache: "no-store" });
+async function fetchBulkMeta(url: string): Promise<ScryfallBulkMeta> {
+  const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`Failed to fetch Scryfall metadata (${response.status})`);
   }
@@ -148,12 +151,62 @@ async function downloadBulkData(downloadUri: string, updatedAt: string) {
   await fs.writeFile(META_PATH, JSON.stringify(meta, null, 2), "utf8");
 }
 
+async function downloadRussianNames(downloadUri: string, updatedAt: string) {
+  const response = await fetch(downloadUri, { cache: "no-store" });
+  if (!response.ok || !response.body) {
+    throw new Error(`Failed to download Scryfall data (${response.status})`);
+  }
+
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  const out = createWriteStream(RU_NAMES_PATH, { encoding: "utf8" });
+  const arrayStreamer = streamArray();
+  let first = true;
+  let wroteAny = false;
+
+  arrayStreamer.on("data", ({ value }: { value: any }) => {
+    if (value.lang !== "ru" || !value.printed_name || !value.oracle_id) return;
+    const slim = {
+      oracle_id: value.oracle_id,
+      printed_name: value.printed_name
+    };
+    out.write((first ? "[" : ",") + JSON.stringify(slim));
+    first = false;
+    wroteAny = true;
+  });
+
+  const readable = response.body ? (Readable.fromWeb(response.body as any) as any) : null;
+  if (!readable) {
+    throw new Error("No response body while downloading Scryfall data");
+  }
+
+  await pipeline(readable as any, jsonParser() as any, arrayStreamer as any);
+  if (wroteAny) {
+    out.write("]");
+  } else {
+    out.write("[]");
+  }
+  out.end();
+
+  const meta: StoredMeta = {
+    updatedAt,
+    downloadedAt: new Date().toISOString()
+  };
+  await fs.writeFile(RU_META_PATH, JSON.stringify(meta, null, 2), "utf8");
+}
+
 async function ensureDataUpToDate() {
-  const localMeta = await readStoredMeta();
+  const [localMeta, localRuMeta] = await Promise.all([
+    readStoredMeta(META_PATH),
+    readStoredMeta(RU_META_PATH)
+  ]);
   let remoteMeta: ScryfallBulkMeta | null = null;
+  let remoteAllMeta: ScryfallBulkMeta | null = null;
 
   try {
-    remoteMeta = await fetchBulkMeta();
+    [remoteMeta, remoteAllMeta] = await Promise.all([
+      fetchBulkMeta(BULK_META_URL),
+      fetchBulkMeta(BULK_ALL_META_URL)
+    ]);
   } catch (error) {
     if (!(await fileExists(DATA_PATH))) {
       throw error instanceof Error ? error : new Error("Unable to fetch Scryfall metadata.");
@@ -172,6 +225,17 @@ async function ensureDataUpToDate() {
     log("info", "Updating Scryfall bulk data", { updatedAt: remoteMeta.updated_at });
     await downloadBulkData(remoteMeta.download_uri, remoteMeta.updated_at);
   }
+
+  const needsRuDownload =
+    !(await fileExists(RU_NAMES_PATH)) ||
+    !localRuMeta ||
+    new Date(remoteAllMeta.updated_at).getTime() >
+      new Date(localRuMeta.updatedAt).getTime();
+
+  if (needsRuDownload) {
+    log("info", "Updating Scryfall Russian name data", { updatedAt: remoteAllMeta.updated_at });
+    await downloadRussianNames(remoteAllMeta.download_uri, remoteAllMeta.updated_at);
+  }
 }
 
 async function loadCards(): Promise<ScryfallCard[]> {
@@ -181,7 +245,22 @@ async function loadCards(): Promise<ScryfallCard[]> {
   return data;
 }
 
-function buildResolver(cards: ScryfallCard[]): OracleResolver {
+async function loadRussianNames(): Promise<Array<{ oracle_id?: string; printed_name?: string }>> {
+  if (!(await fileExists(RU_NAMES_PATH))) {
+    return [];
+  }
+  try {
+    const raw = await fs.readFile(RU_NAMES_PATH, "utf8");
+    return JSON.parse(raw) as Array<{ oracle_id?: string; printed_name?: string }>;
+  } catch {
+    return [];
+  }
+}
+
+function buildResolver(
+  cards: ScryfallCard[],
+  russianNames: Array<{ oracle_id?: string; printed_name?: string }>
+): OracleResolver {
   const map = new Map<string, string>();
   const buckets = new Map<string, ScryfallCard[]>();
 
@@ -277,6 +356,14 @@ function buildResolver(cards: ScryfallCard[]): OracleResolver {
     });
   }
 
+  russianNames.forEach((entry) => {
+    if (!entry.oracle_id || !entry.printed_name) return;
+    const key = resolverKey(entry.printed_name);
+    if (key && !map.has(key)) {
+      map.set(key, entry.oracle_id);
+    }
+  });
+
   // Choose the best image per oracle: prefer non-foil, non-promo, non-special frames, latest printing.
   buckets.forEach((cardsForOracle, oracleId) => {
     const sorted = cardsForOracle.sort((a, b) => {
@@ -316,8 +403,11 @@ export async function getOracleResolver(): Promise<OracleResolver> {
   }
   if (!resolverPromise) {
     resolverPromise = (async () => {
-      const cards = await loadCards();
-      return buildResolver(cards);
+      const [cards, russianNames] = await Promise.all([
+        loadCards(),
+        loadRussianNames()
+      ]);
+      return buildResolver(cards, russianNames);
     })();
   }
   return resolverPromise;

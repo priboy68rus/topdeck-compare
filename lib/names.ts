@@ -4,30 +4,41 @@ export function cleanCardName(name: string): string {
   while (tokens.length > 0) {
     const token = tokens[tokens.length - 1];
     const lower = token.toLowerCase();
+    const normalized = lower.replace(/[^\p{L}\p{N}]+/gu, "");
 
     const isDescriptor =
-      lower === "foil" ||
-      lower === "etched" ||
-      lower === "nonfoil" ||
-      lower === "alt" ||
-      lower === "promo" ||
-      lower === "prerelease" ||
-      lower === "signed";
+      normalized === "foil" ||
+      normalized === "etched" ||
+      normalized === "nonfoil" ||
+      normalized === "alt" ||
+      normalized === "promo" ||
+      normalized === "prerelease" ||
+      normalized === "signed" ||
+      normalized === "фойл" ||
+      normalized === "фоил" ||
+      normalized === "фуларт" ||
+      normalized === "фулларт" ||
+      normalized === "промо" ||
+      normalized === "подпись" ||
+      normalized === "подписано";
 
     const isLanguage =
-      lower === "en" ||
-      lower === "eng" ||
-      lower === "ru" ||
-      lower === "rus" ||
-      lower === "jp" ||
-      lower === "ja" ||
-      lower === "de" ||
-      lower === "fr" ||
-      lower === "es" ||
-      lower === "it" ||
-      lower === "pt" ||
-      lower === "cn" ||
-      lower === "ko";
+      normalized === "en" ||
+      normalized === "eng" ||
+      normalized === "ru" ||
+      normalized === "rus" ||
+      normalized === "рус" ||
+      normalized === "русский" ||
+      normalized === "англ" ||
+      normalized === "jp" ||
+      normalized === "ja" ||
+      normalized === "de" ||
+      normalized === "fr" ||
+      normalized === "es" ||
+      normalized === "it" ||
+      normalized === "pt" ||
+      normalized === "cn" ||
+      normalized === "ko";
 
     const isSetCode = /^[A-Z]{2,4}\d?$/.test(token);
 
@@ -41,7 +52,7 @@ export function cleanCardName(name: string): string {
   return tokens
     .join(" ")
     .toLowerCase()
-    .replace(/[^a-z0-9/]+/gi, " ")
+    .replace(/[^\p{L}\p{N}/]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
