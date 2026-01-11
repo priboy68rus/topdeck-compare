@@ -1,5 +1,5 @@
 import http from "http";
-import { getOracleData } from "../lib/scryfall";
+import { getOracleData, preloadBulkData } from "../lib/scryfall";
 
 const PORT = Number(process.env.RESOLVER_PORT || 4000);
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
@@ -76,6 +76,16 @@ const server = http.createServer(async (req, res) => {
   sendJson(res, 404, { error: "Not found" });
 });
 
-server.listen(PORT, () => {
-  console.log(`Oracle resolver listening on :${PORT}`);
-});
+(async () => {
+  try {
+    console.log("[resolver] Preloading Scryfall bulk data...");
+    await preloadBulkData();
+    console.log("[resolver] Scryfall bulk data ready.");
+  } catch (error) {
+    console.error("[resolver] Failed to preload Scryfall data", error);
+  }
+
+  server.listen(PORT, () => {
+    console.log(`Oracle resolver listening on :${PORT}`);
+  });
+})();

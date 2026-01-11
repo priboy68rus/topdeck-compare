@@ -152,6 +152,7 @@ async function downloadBulkData(downloadUri: string, updatedAt: string) {
 }
 
 async function downloadRussianNames(downloadUri: string, updatedAt: string) {
+  log("info", "Downloading Scryfall Russian name data");
   const response = await fetch(downloadUri, { cache: "no-store" });
   if (!response.ok || !response.body) {
     throw new Error(`Failed to download Scryfall data (${response.status})`);
@@ -192,6 +193,7 @@ async function downloadRussianNames(downloadUri: string, updatedAt: string) {
     downloadedAt: new Date().toISOString()
   };
   await fs.writeFile(RU_META_PATH, JSON.stringify(meta, null, 2), "utf8");
+  log("info", "Finished downloading Scryfall Russian name data");
 }
 
 async function ensureDataUpToDate() {
@@ -411,6 +413,12 @@ export async function getOracleResolver(): Promise<OracleResolver> {
     })();
   }
   return resolverPromise;
+}
+
+export async function preloadBulkData(): Promise<void> {
+  log("info", "Preloading Scryfall bulk data");
+  await ensureDataUpToDate();
+  log("info", "Finished preloading Scryfall bulk data");
 }
 
 export async function getOracleImageUrl(oracleId: string): Promise<string | undefined> {

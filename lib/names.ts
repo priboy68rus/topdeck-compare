@@ -12,6 +12,9 @@ export function cleanCardName(name: string): string {
       normalized === "nonfoil" ||
       normalized === "alt" ||
       normalized === "promo" ||
+      normalized === "list" ||
+      normalized === "plist" ||
+      normalized === "plst" ||
       normalized === "prerelease" ||
       normalized === "signed" ||
       normalized === "фойл" ||
